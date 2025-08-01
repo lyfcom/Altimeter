@@ -57,78 +57,79 @@ fun HistoryScreen(
     Column(
         modifier = modifier.fillMaxSize()
     ) {
-        // 标题栏
-        TopAppBar(
-            title = {
+        // 紧凑的标题行
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
                 Text(
                     text = "海拔历史",
+                style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold
                 )
-            },
-            actions = {
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 // 自动记录开关
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(end = 4.dp)
-                ) {
                     Text(
                         text = "自动记录",
                         style = MaterialTheme.typography.labelSmall
                     )
-                    Spacer(modifier = Modifier.width(2.dp))
                     Switch(
                         checked = isAutoRecordEnabled,
                         onCheckedChange = viewModel::setAutoRecordEnabled,
                         modifier = Modifier.scale(0.8f)
                     )
-                }
                 
                 // 分享按钮
                 IconButton(
-                    onClick = { 
-                        showShareOptions = true
-                    },
-                    modifier = Modifier.size(40.dp)
+                    onClick = { showShareOptions = true },
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Share,
                         contentDescription = "分享数据",
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-                
-                // 分享选项弹窗
-                if (showShareOptions) {
-                    ShareOptionsDialog(
-                        onDismiss = { showShareOptions = false },
-                        onShareStatistics = {
-                            ShareHelper.shareStatistics(context, statistics, records)
-                            showShareOptions = false
-                        },
-                        onShareRecordsText = {
-                            ShareHelper.shareRecordsAsText(context, records)
-                            showShareOptions = false
-                        },
-                        onShareRecordsCSV = {
-                            ShareHelper.shareRecordsAsCSV(context, records)
-                            showShareOptions = false
-                        }
+                        modifier = Modifier.size(18.dp)
                     )
                 }
                 
                 // 清除按钮
                 IconButton(
                     onClick = viewModel::clearAllRecords,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = "清除记录",
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
-        )
+        }
+        
+        // 分享选项弹窗
+        if (showShareOptions) {
+            ShareOptionsDialog(
+                onDismiss = { showShareOptions = false },
+                onShareStatistics = {
+                    ShareHelper.shareStatistics(context, statistics, records)
+                    showShareOptions = false
+                },
+                onShareRecordsText = {
+                    ShareHelper.shareRecordsAsText(context, records)
+                    showShareOptions = false
+                },
+                onShareRecordsCSV = {
+                    ShareHelper.shareRecordsAsCSV(context, records)
+                    showShareOptions = false
+                }
+            )
+        }
         
         // 标签页
         TabRow(
@@ -214,8 +215,8 @@ fun ChartTab(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // 时间范围选择器
         TimeRangeSelector(
@@ -361,8 +362,8 @@ fun StatisticsTab(
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
-        modifier = modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // 总体统计
         item {
@@ -416,7 +417,7 @@ fun RecordsTab(
 ) {
     if (records.isNotEmpty()) {
         LazyColumn(
-            modifier = modifier.padding(16.dp),
+            modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(records.reversed()) { record ->
@@ -698,6 +699,8 @@ fun CustomDateRangeDialog(
     val today = java.time.LocalDate.now()
     var selectedStartDate by remember { mutableStateOf(startDate ?: today.minusDays(7)) }
     var selectedEndDate by remember { mutableStateOf(endDate ?: today) }
+    var showStartDatePicker by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
     
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -720,19 +723,37 @@ fun CustomDateRangeDialog(
                         fontWeight = FontWeight.Medium
                     )
                     
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // 精确日期选择按钮
+                    OutlinedButton(
+                        onClick = { showStartDatePicker = true },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        // 简化的日期选择按钮
-                        listOf(
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = selectedStartDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日")),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    
+                    // 快捷日期选择
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        items(listOf(
                             "今天" to today,
                             "昨天" to today.minusDays(1),
-                            "3天前" to today.minusDays(3),
                             "7天前" to today.minusDays(7),
-                            "30天前" to today.minusDays(30)
-                        ).forEach { (label, date) ->
+                            "30天前" to today.minusDays(30),
+                            "90天前" to today.minusDays(90)
+                        )) { (label, date) ->
                             FilterChip(
                                 onClick = { selectedStartDate = date },
                                 label = { 
@@ -745,12 +766,6 @@ fun CustomDateRangeDialog(
                             )
                         }
                     }
-                    
-                    Text(
-                        text = "选中: ${selectedStartDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
                 }
                 
                 // 结束日期选择
@@ -761,17 +776,36 @@ fun CustomDateRangeDialog(
                         fontWeight = FontWeight.Medium
                     )
                     
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    // 精确日期选择按钮
+                    OutlinedButton(
+                        onClick = { showEndDatePicker = true },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        listOf(
+                        Icon(
+                            imageVector = Icons.Default.DateRange,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = selectedEndDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日")),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
+                    
+                    // 快捷日期选择
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(top = 4.dp)
+                    ) {
+                        items(listOf(
                             "今天" to today,
                             "昨天" to today.minusDays(1),
                             "3天前" to today.minusDays(3),
                             "7天前" to today.minusDays(7)
-                        ).forEach { (label, date) ->
+                        ).filter { !it.second.isBefore(selectedStartDate) }) { (label, date) ->
                             FilterChip(
                                 onClick = { selectedEndDate = date },
                                 label = { 
@@ -780,26 +814,48 @@ fun CustomDateRangeDialog(
                                         style = MaterialTheme.typography.labelSmall
                                     ) 
                                 },
-                                selected = selectedEndDate == date,
-                                enabled = !date.isBefore(selectedStartDate)
+                                selected = selectedEndDate == date
                             )
                         }
                     }
-                    
-                    Text(
-                        text = "选中: ${selectedEndDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd"))}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
                 }
                 
-                // 验证日期范围
+                // 日期范围提示
                 if (selectedEndDate.isBefore(selectedStartDate)) {
-                    Text(
-                        text = "结束日期不能早于开始日期",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Warning,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "结束日期不能早于开始日期",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                } else {
+                    val daysBetween = java.time.temporal.ChronoUnit.DAYS.between(selectedStartDate, selectedEndDate)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "共选择 ${daysBetween + 1} 天的数据",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         },
@@ -820,6 +876,160 @@ fun CustomDateRangeDialog(
                 ) {
                     Text("确定")
                 }
+            }
+        }
+    )
+    
+    // 开始日期选择器
+    if (showStartDatePicker) {
+        DatePickerModal(
+            initialDate = selectedStartDate,
+            onDateSelected = { date ->
+                selectedStartDate = date
+                // 如果开始日期晚于结束日期，自动调整结束日期
+                if (date.isAfter(selectedEndDate)) {
+                    selectedEndDate = date
+                }
+                showStartDatePicker = false
+            },
+            onDismiss = { showStartDatePicker = false }
+        )
+    }
+    
+    // 结束日期选择器
+    if (showEndDatePicker) {
+        DatePickerModal(
+            initialDate = selectedEndDate,
+            minDate = selectedStartDate,
+            onDateSelected = { date ->
+                selectedEndDate = date
+                showEndDatePicker = false
+            },
+            onDismiss = { showEndDatePicker = false }
+        )
+    }
+}
+
+/**
+ * 日期选择器模态框
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DatePickerModal(
+    initialDate: java.time.LocalDate,
+    minDate: java.time.LocalDate? = null,
+    maxDate: java.time.LocalDate? = null,
+    onDateSelected: (java.time.LocalDate) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialDate.atStartOfDay(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli(),
+        yearRange = (initialDate.year - 10)..(initialDate.year + 1)
+    )
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+                Button(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val selectedDate = java.time.Instant.ofEpochMilli(millis)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toLocalDate()
+                            
+                            // 检查日期范围
+                            val isValidDate = (minDate == null || !selectedDate.isBefore(minDate)) &&
+                                    (maxDate == null || !selectedDate.isAfter(maxDate))
+                            
+                            if (isValidDate) {
+                                onDateSelected(selectedDate)
+                            }
+                        }
+                    },
+                    enabled = datePickerState.selectedDateMillis != null
+                ) {
+                    Text("确定")
+                }
+            }
+        },
+        text = {
+            Column {
+                // 日期范围提示
+                if (minDate != null || maxDate != null) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            Text(
+                                text = "日期范围限制",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            if (minDate != null) {
+                                Text(
+                                    text = "最早日期: ${minDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日"))}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                            if (maxDate != null) {
+                                Text(
+                                    text = "最晚日期: ${maxDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日"))}",
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // 日期选择器
+                DatePicker(
+                    state = datePickerState,
+                    modifier = Modifier.fillMaxWidth(),
+                    showModeToggle = true,
+                    title = {
+                        Text(
+                            text = "选择日期",
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    },
+                    headline = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val selectedDate = java.time.Instant.ofEpochMilli(millis)
+                                .atZone(java.time.ZoneId.systemDefault())
+                                .toLocalDate()
+                            
+                            val isValidDate = (minDate == null || !selectedDate.isBefore(minDate)) &&
+                                    (maxDate == null || !selectedDate.isAfter(maxDate))
+                            
+                            Text(
+                                text = if (isValidDate) {
+                                    selectedDate.format(java.time.format.DateTimeFormatter.ofPattern("yyyy年MM月dd日"))
+                                } else {
+                                    "请选择有效日期"
+                                },
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                color = if (isValidDate) {
+                                    MaterialTheme.colorScheme.onSurface
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                }
+                            )
+                        }
+                    }
+                )
             }
         }
     )
