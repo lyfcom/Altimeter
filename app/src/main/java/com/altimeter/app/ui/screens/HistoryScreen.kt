@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.platform.LocalContext
 import com.altimeter.app.data.models.*
@@ -53,6 +54,7 @@ fun HistoryScreen(
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
     var showShareOptions by remember { mutableStateOf(false) }
+    var showClearAllConfirmation by remember { mutableStateOf(false) }
     
     Column(
         modifier = modifier.fillMaxSize()
@@ -71,10 +73,10 @@ fun HistoryScreen(
                     fontWeight = FontWeight.Bold
                 )
             
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
+                ) {
                 // 自动记录开关
                     Text(
                         text = "自动记录",
@@ -100,7 +102,7 @@ fun HistoryScreen(
                 
                 // 清除按钮
                 IconButton(
-                    onClick = viewModel::clearAllRecords,
+                    onClick = { showClearAllConfirmation = true },
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
@@ -128,6 +130,19 @@ fun HistoryScreen(
                     ShareHelper.shareRecordsAsCSV(context, records)
                     showShareOptions = false
                 }
+            )
+        }
+        
+        // 清除所有记录确认对话框
+        if (showClearAllConfirmation) {
+            DeleteConfirmationDialog(
+                title = "清除所有记录",
+                message = "确定要删除所有海拔记录吗？\n\n此操作将永久删除：\n• 所有海拔测量记录\n• 所有测量会话\n• 相关统计数据\n\n此操作无法撤销！",
+                onConfirm = {
+                    viewModel.clearAllRecords()
+                    showClearAllConfirmation = false
+                },
+                onDismiss = { showClearAllConfirmation = false }
             )
         }
         
@@ -415,6 +430,7 @@ fun RecordsTab(
     onDeleteRecord: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var recordToDelete by remember { mutableStateOf<AltitudeRecord?>(null) }
     if (records.isNotEmpty()) {
         LazyColumn(
             modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -423,7 +439,7 @@ fun RecordsTab(
             items(records.reversed()) { record ->
                 RecordCard(
                     record = record,
-                    onDelete = { onDeleteRecord(record.id) }
+                    onDelete = { recordToDelete = record }
                 )
             }
         }
@@ -458,6 +474,19 @@ fun RecordsTab(
                 textAlign = TextAlign.Center
             )
         }
+    }
+    
+    // 单个记录删除确认对话框
+    recordToDelete?.let { record ->
+        DeleteConfirmationDialog(
+            title = "删除记录",
+            message = "确定要删除这条海拔记录吗？\n\n记录信息：\n• 海拔高度：${String.format("%.1f", record.altitude)} 米\n• 数据源：${record.source.displayName}\n• 测量时间：${record.timestamp.format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))}\n\n此操作无法撤销！",
+            onConfirm = {
+                onDeleteRecord(record.id)
+                recordToDelete = null
+            },
+            onDismiss = { recordToDelete = null }
+        )
     }
 }
 
@@ -1030,6 +1059,60 @@ fun DatePickerModal(
                         }
                     }
                 )
+            }
+        }
+    )
+}
+
+/**
+ * 删除确认对话框
+ */
+@Composable
+fun DeleteConfirmationDialog(
+    title: String,
+    message: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Warning,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        title = {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.error
+            )
+        },
+        text = {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                lineHeight = 20.sp
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Text("删除")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
             }
         }
     )
