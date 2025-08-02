@@ -26,6 +26,8 @@ import com.altimeter.app.data.models.*
 import com.altimeter.app.ui.components.AltitudeChart
 import com.altimeter.app.ui.viewmodels.AltimeterViewModel
 import com.altimeter.app.utils.ShareHelper
+import com.altimeter.app.utils.filterRecordsForRange
+import com.altimeter.app.utils.computeStatistics
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,6 +56,10 @@ fun HistoryScreen(
     val context = LocalContext.current
     var selectedTab by remember { mutableIntStateOf(0) }
     var showShareOptions by remember { mutableStateOf(false) }
+    var showShareRangeDialog by remember { mutableStateOf(false) }
+    var shareTimeRange by remember { mutableStateOf(TimeRange.ALL) }
+    var shareCustomStartDate by remember { mutableStateOf<java.time.LocalDate?>(null) }
+    var shareCustomEndDate by remember { mutableStateOf<java.time.LocalDate?>(null) }
     var showClearAllConfirmation by remember { mutableStateOf(false) }
     
     Column(
@@ -90,7 +96,7 @@ fun HistoryScreen(
                 
                 // 分享按钮
                 IconButton(
-                    onClick = { showShareOptions = true },
+                    onClick = { showShareRangeDialog = true },
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
@@ -114,20 +120,41 @@ fun HistoryScreen(
             }
         }
         
+        // 分享日期范围选择弹窗
+        if (showShareRangeDialog) {
+            ShareRangeDialog(
+                currentRange = shareTimeRange,
+                customStart = shareCustomStartDate,
+                customEnd = shareCustomEndDate,
+                onRangeConfirmed = { range, start, end ->
+                    shareTimeRange = range
+                    shareCustomStartDate = start
+                    shareCustomEndDate = end
+                    showShareRangeDialog = false
+                    showShareOptions = true // 下一步
+                },
+                onDismiss = { showShareRangeDialog = false }
+            )
+        }
+
         // 分享选项弹窗
         if (showShareOptions) {
             ShareOptionsDialog(
                 onDismiss = { showShareOptions = false },
                 onShareStatistics = {
-                    ShareHelper.shareStatistics(context, statistics, records)
+                    val shareRecords = filterRecordsForRange(records, shareTimeRange, shareCustomStartDate, shareCustomEndDate)
+                    val shareStats = computeStatistics(shareRecords)
+                    ShareHelper.shareStatistics(context, shareStats, shareRecords)
                     showShareOptions = false
                 },
                 onShareRecordsText = {
-                    ShareHelper.shareRecordsAsText(context, records)
+                    val shareRecords = filterRecordsForRange(records, shareTimeRange, shareCustomStartDate, shareCustomEndDate)
+                    ShareHelper.shareRecordsAsText(context, shareRecords)
                     showShareOptions = false
                 },
                 onShareRecordsCSV = {
-                    ShareHelper.shareRecordsAsCSV(context, records)
+                    val shareRecords = filterRecordsForRange(records, shareTimeRange, shareCustomStartDate, shareCustomEndDate)
+                    ShareHelper.shareRecordsAsCSV(context, shareRecords)
                     showShareOptions = false
                 }
             )
@@ -1121,6 +1148,67 @@ fun DeleteConfirmationDialog(
 /**
  * 分享选项对话框
  */
+/**
+ * 分享前的范围选择对话框
+ */
+@Composable
+fun ShareRangeDialog(
+    currentRange: TimeRange,
+    customStart: java.time.LocalDate?,
+    customEnd: java.time.LocalDate?,
+    onRangeConfirmed: (TimeRange, java.time.LocalDate?, java.time.LocalDate?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedRange by remember { mutableStateOf(currentRange) }
+    var startDate by remember { mutableStateOf(customStart) }
+    var endDate by remember { mutableStateOf(customEnd) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("选择分享范围", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TimeRangeSelector(
+                    selectedRange = selectedRange,
+                    onRangeSelected = { range ->
+                        selectedRange = range
+                        if (range == TimeRange.CUSTOM) {
+                            showDatePicker = true
+                        }
+                    },
+                    customStartDate = startDate,
+                    customEndDate = endDate
+                )
+                if (showDatePicker) {
+                    CustomDateRangeDialog(
+                        startDate = startDate,
+                        endDate = endDate,
+                        onDateRangeSelected = { s, e ->
+                            startDate = s
+                            endDate = e
+                            showDatePicker = false
+                        },
+                        onDismiss = {
+                            showDatePicker = false
+                        }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onRangeConfirmed(selectedRange, startDate, endDate)
+            }) { Text("下一步") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("取消") }
+        }
+    )
+}
+
 @Composable
 fun ShareOptionsDialog(
     onDismiss: () -> Unit,
