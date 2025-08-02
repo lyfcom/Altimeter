@@ -158,7 +158,8 @@ fun ControlButtons(
         // 实时更新切换按钮
         Button(
             onClick = onToggleRealTime,
-            colors = if (measurementState.isRealTimeEnabled) {
+            enabled = measurementState.isRealTimeEnabled != null, // 未知状态时禁用
+            colors = if (measurementState.isRealTimeEnabled == true) {
                 ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
             } else {
                 ButtonDefaults.buttonColors()
@@ -166,12 +167,16 @@ fun ControlButtons(
             modifier = Modifier.weight(1f)
         ) {
             Icon(
-                imageVector = if (measurementState.isRealTimeEnabled) Icons.Default.Stop else Icons.Default.PlayArrow,
+                imageVector = if (measurementState.isRealTimeEnabled == true) Icons.Default.Stop else Icons.Default.PlayArrow,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
-            Text(if (measurementState.isRealTimeEnabled) "停止" else "实时")
+            Text(
+                if (measurementState.isRealTimeEnabled == null) "连接中..."
+                else if (measurementState.isRealTimeEnabled == true) "停止" 
+                else "实时"
+            )
         }
         
         // 清除按钮
@@ -260,7 +265,7 @@ fun StatusCard(measurementState: AltitudeMeasurement) {
                     )
                 }
                 
-                if (measurementState.isRealTimeEnabled) {
+                if (measurementState.isRealTimeEnabled == true) {
                     Text(
                         text = "实时更新已启用",
                         style = MaterialTheme.typography.bodySmall,

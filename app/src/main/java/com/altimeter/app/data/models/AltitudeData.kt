@@ -60,5 +60,5 @@ data class AltitudeMeasurement(
     val status: MeasurementStatus,
     val data: List<AltitudeData>,
     val errorMessage: String? = null,
-    val isRealTimeEnabled: Boolean = false
+    val isRealTimeEnabled: Boolean? = false
 )

@@ -5,6 +5,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.SharedPreferences
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -25,6 +26,7 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
     private val locationService = LocationService(application)
     private val compositeAltitudeService = CompositeAltitudeServiceImpl()
     private val recordRepository = AltitudeRecordRepository(application)
+    private val sharedPrefs = application.getSharedPreferences("altimeter_settings", Context.MODE_PRIVATE)
     
     // 前台服务相关
     private var monitoringService: AltitudeMonitoringService? = null
@@ -35,6 +37,13 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
             val binder = service as AltitudeMonitoringService.LocalBinder
             monitoringService = binder.getService()
             isBound = true
+            
+            // 立即同步服务的当前状态
+            monitoringService?.let { service ->
+                _measurementState.value = _measurementState.value.copy(
+                    isRealTimeEnabled = service.isMonitoring.value
+                )
+            }
             
             // 订阅服务状态
             viewModelScope.launch {
@@ -88,7 +97,7 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
         AltitudeMeasurement(
             status = MeasurementStatus.IDLE,
             data = emptyList(),
-            isRealTimeEnabled = false
+            isRealTimeEnabled = null // null表示未知状态，等待服务绑定后同步
         )
     )
     val measurementState: StateFlow<AltitudeMeasurement> = _measurementState.asStateFlow()
@@ -118,10 +127,16 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
     // 更新间隔（毫秒）
     private var updateInterval = 5000L
     
+    companion object {
+        private const val PREF_UPDATE_INTERVAL = "update_interval"
+        private const val DEFAULT_UPDATE_INTERVAL = 5000L
+    }
+    
     init {
         initializeServices()
         checkPermissions()
         loadAutoRecordSetting()
+        loadUpdateInterval()
         bindToMonitoringService()
     }
     
@@ -248,7 +263,12 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
     fun toggleRealTimeMeasurement() {
         val currentState = _measurementState.value
         
-        if (currentState.isRealTimeEnabled) {
+        // 如果状态未知（null），不执行操作，等待服务绑定
+        if (currentState.isRealTimeEnabled == null) {
+            return
+        }
+        
+        if (currentState.isRealTimeEnabled == true) {
             stopRealTimeMeasurement()
         } else {
             startRealTimeMeasurement()
@@ -300,11 +320,26 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
     fun setUpdateInterval(intervalMs: Long) {
         updateInterval = intervalMs
         
+        // 保存到 SharedPreferences
+        sharedPrefs.edit().putLong(PREF_UPDATE_INTERVAL, intervalMs).apply()
+        
         // 如果正在实时更新，更新服务间隔
-        if (_measurementState.value.isRealTimeEnabled) {
+        if (_measurementState.value.isRealTimeEnabled == true) {
             monitoringService?.setUpdateInterval(intervalMs)
         }
     }
+    
+    /**
+     * 加载更新间隔设置
+     */
+    private fun loadUpdateInterval() {
+        updateInterval = sharedPrefs.getLong(PREF_UPDATE_INTERVAL, DEFAULT_UPDATE_INTERVAL)
+    }
+    
+    /**
+     * 获取当前更新间隔
+     */
+    fun getCurrentUpdateInterval(): Long = updateInterval
     
     /**
      * 清除测量结果

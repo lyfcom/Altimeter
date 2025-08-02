@@ -21,7 +21,9 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     viewModel: AltimeterViewModel = viewModel()
 ) {
-    var selectedInterval by remember { mutableIntStateOf(5000) }
+    // 当前更新间隔
+    val currentInterval = viewModel.getCurrentUpdateInterval()
+    var selectedInterval by remember { mutableIntStateOf(currentInterval.toInt()) }
     
     Column(
         modifier = modifier
