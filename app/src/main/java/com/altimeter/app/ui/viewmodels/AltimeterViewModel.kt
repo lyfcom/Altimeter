@@ -1,12 +1,18 @@
 package com.altimeter.app.ui.viewmodels
 
 import android.app.Application
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.altimeter.app.data.models.*
 import com.altimeter.app.data.repository.AltitudeRecordRepository
 import com.altimeter.app.data.services.LocationService
 import com.altimeter.app.data.services.impl.*
+import com.altimeter.app.services.AltitudeMonitoringService
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -19,6 +25,63 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
     private val locationService = LocationService(application)
     private val compositeAltitudeService = CompositeAltitudeServiceImpl()
     private val recordRepository = AltitudeRecordRepository(application)
+    
+    // 前台服务相关
+    private var monitoringService: AltitudeMonitoringService? = null
+    private var isBound = false
+    
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(className: ComponentName, service: IBinder) {
+            val binder = service as AltitudeMonitoringService.LocalBinder
+            monitoringService = binder.getService()
+            isBound = true
+            
+            // 订阅服务状态
+            viewModelScope.launch {
+                monitoringService?.let { service ->
+                    // 监听服务状态变化
+                    service.isMonitoring.collect { isMonitoring ->
+                        _measurementState.value = _measurementState.value.copy(
+                            isRealTimeEnabled = isMonitoring
+                        )
+                    }
+                }
+            }
+            
+            viewModelScope.launch {
+                monitoringService?.measurementStatus?.collect { status ->
+                    _measurementState.value = _measurementState.value.copy(status = status)
+                }
+            }
+            
+            viewModelScope.launch {
+                monitoringService?.currentLocation?.collect { location ->
+                    _currentLocation.value = location
+                }
+            }
+            
+            viewModelScope.launch {
+                monitoringService?.latestAltitudeData?.collect { data ->
+                    _measurementState.value = _measurementState.value.copy(data = data)
+                }
+            }
+            
+            // 监听记录更新通知
+            viewModelScope.launch {
+                monitoringService?.recordAdded?.collect { timestamp ->
+                    if (timestamp > 0) {
+                        // 有新记录时，强制刷新repository数据
+                        recordRepository.refreshData()
+                    }
+                }
+            }
+        }
+        
+        override fun onServiceDisconnected(className: ComponentName) {
+            monitoringService = null
+            isBound = false
+        }
+    }
     
     // 当前测量状态
     private val _measurementState = MutableStateFlow(
@@ -59,6 +122,19 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
         initializeServices()
         checkPermissions()
         loadAutoRecordSetting()
+        bindToMonitoringService()
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        // 取消实时更新任务
+        realTimeUpdateJob?.cancel()
+        // 解绑前台服务
+        unbindFromMonitoringService()
+        // 清理会话
+        viewModelScope.launch {
+            recordRepository.endCurrentSession()
+        }
     }
     
     /**
@@ -69,6 +145,24 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
             addService(GnssAltitudeService())
             addService(BarometerAltitudeService(getApplication()))
             addService(ElevationApiService())
+        }
+    }
+    
+    /**
+     * 绑定到前台服务
+     */
+    private fun bindToMonitoringService() {
+        val intent = Intent(getApplication(), AltitudeMonitoringService::class.java)
+        getApplication<Application>().bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+    }
+    
+    /**
+     * 解绑前台服务
+     */
+    private fun unbindFromMonitoringService() {
+        if (isBound) {
+            getApplication<Application>().unbindService(serviceConnection)
+            isBound = false
         }
     }
     
@@ -173,53 +267,16 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
             return
         }
         
-        realTimeUpdateJob?.cancel()
-        realTimeUpdateJob = viewModelScope.launch {
-            _measurementState.value = _measurementState.value.copy(
-                isRealTimeEnabled = true,
-                status = MeasurementStatus.LOCATING
-            )
-            
-            // 开始新的测量会话
-            currentSessionId = recordRepository.startNewSession(SessionType.REAL_TIME_SESSION)
-            
-            locationService.getLocationUpdates(updateInterval)
-                .catch { error ->
-                    _measurementState.value = _measurementState.value.copy(
-                        status = MeasurementStatus.ERROR,
-                        errorMessage = "位置更新失败: ${error.message}",
-                        isRealTimeEnabled = false
-                    )
-                }
-                .collect { location ->
-                    _currentLocation.value = location
-                    
-                    try {
-                        _measurementState.value = _measurementState.value.copy(
-                            status = MeasurementStatus.MEASURING
-                        )
-                        
-                        val altitudeData = compositeAltitudeService.getAllAltitudeData(location)
-                        
-                        _measurementState.value = _measurementState.value.copy(
-                            status = MeasurementStatus.SUCCESS,
-                            data = altitudeData.sortedByDescending { it.reliability }
-                        )
-                        
-                        // 实时测量中自动记录最佳数据
-                        if (_isAutoRecordEnabled.value) {
-                            val bestData = altitudeData.maxByOrNull { it.reliability }
-                            bestData?.let { data ->
-                                recordRepository.addRecord(data, SessionType.REAL_TIME_SESSION)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        _measurementState.value = _measurementState.value.copy(
-                            status = MeasurementStatus.ERROR,
-                            errorMessage = "海拔测量失败: ${e.message}"
-                        )
-                    }
-                }
+        // 使用前台服务进行后台监测
+        monitoringService?.let { service ->
+            service.setAutoRecordEnabled(_isAutoRecordEnabled.value)
+            service.startMonitoring(updateInterval)
+        } ?: run {
+            // 如果服务未绑定，启动服务
+            val intent = Intent(getApplication(), AltitudeMonitoringService::class.java).apply {
+                action = AltitudeMonitoringService.ACTION_START_MONITORING
+            }
+            getApplication<Application>().startForegroundService(intent)
         }
     }
     
@@ -227,23 +284,14 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
      * 停止实时测量
      */
     private fun stopRealTimeMeasurement() {
-        realTimeUpdateJob?.cancel()
-        realTimeUpdateJob = null
-        
-        // 结束当前会话
-        viewModelScope.launch {
-            recordRepository.endCurrentSession()
-            currentSessionId = null
-        }
-        
-        _measurementState.value = _measurementState.value.copy(
-            isRealTimeEnabled = false,
-            status = if (_measurementState.value.data.isNotEmpty()) {
-                MeasurementStatus.SUCCESS
-            } else {
-                MeasurementStatus.IDLE
+        // 停止前台服务
+        monitoringService?.stopMonitoring() ?: run {
+            // 如果服务未绑定，通过Intent停止
+            val intent = Intent(getApplication(), AltitudeMonitoringService::class.java).apply {
+                action = AltitudeMonitoringService.ACTION_STOP_MONITORING
             }
-        )
+            getApplication<Application>().startService(intent)
+        }
     }
     
     /**
@@ -252,9 +300,9 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
     fun setUpdateInterval(intervalMs: Long) {
         updateInterval = intervalMs
         
-        // 如果正在实时更新，重启以应用新间隔
+        // 如果正在实时更新，更新服务间隔
         if (_measurementState.value.isRealTimeEnabled) {
-            startRealTimeMeasurement()
+            monitoringService?.setUpdateInterval(intervalMs)
         }
     }
     
@@ -284,6 +332,8 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
     fun setAutoRecordEnabled(enabled: Boolean) {
         _isAutoRecordEnabled.value = enabled
         recordRepository.saveAutoRecordEnabled(enabled)
+        // 同步到监测服务
+        monitoringService?.setAutoRecordEnabled(enabled)
     }
     
     /**
@@ -326,12 +376,5 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
     fun getRecordsInTimeRange(startTime: java.time.LocalDateTime, endTime: java.time.LocalDateTime) = 
         recordRepository.getRecordsInTimeRange(startTime, endTime)
     
-    override fun onCleared() {
-        super.onCleared()
-        realTimeUpdateJob?.cancel()
-        // 清理会话
-        viewModelScope.launch {
-            recordRepository.endCurrentSession()
-        }
-    }
+
 }

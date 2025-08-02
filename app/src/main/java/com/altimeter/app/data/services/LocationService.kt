@@ -18,6 +18,11 @@ import kotlin.coroutines.resume
  * 位置服务 - 管理GPS位置获取
  */
 class LocationService(private val context: Context) {
+    private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
+    private fun isGooglePlayServicesAvailable(): Boolean {
+        return com.google.android.gms.common.GoogleApiAvailability.getInstance()
+            .isGooglePlayServicesAvailable(context) == com.google.android.gms.common.ConnectionResult.SUCCESS
+    }
     
     private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
@@ -48,22 +53,31 @@ class LocationService(private val context: Context) {
         try {
             fusedLocationClient.lastLocation.addOnSuccessListener { location ->
                 if (location != null) {
-                    val locationInfo = LocationInfo(
-                        latitude = location.latitude,
-                        longitude = location.longitude,
-                        accuracy = location.accuracy,
-                        altitude = if (location.hasAltitude()) location.altitude else null,
-                        timestamp = location.time
-                    )
-                    continuation.resume(Result.success(locationInfo))
+                    continuation.resume(Result.success(location.toLocationInfo()))
                 } else {
                     // 如果没有缓存位置，请求新的位置
                     requestNewLocation { result ->
-                        continuation.resume(result)
+                        if (result.isSuccess) {
+                            continuation.resume(result)
+                        } else {
+                            // 如果FusedLocation失败，尝试使用系统LocationManager作为回退
+                            val fallback = getLastKnownLocationFromManager()
+                            if (fallback != null) {
+                                continuation.resume(Result.success(fallback))
+                            } else {
+                                continuation.resume(result)
+                            }
+                        }
                     }
                 }
             }.addOnFailureListener { exception ->
-                continuation.resume(Result.failure(exception))
+                // FusedLocation失败，使用LocationManager
+                val fallback = getLastKnownLocationFromManager()
+                if (fallback != null) {
+                    continuation.resume(Result.success(fallback))
+                } else {
+                    continuation.resume(Result.failure(exception))
+                }
             }
         } catch (e: SecurityException) {
             continuation.resume(Result.failure(e))
@@ -121,6 +135,31 @@ class LocationService(private val context: Context) {
     /**
      * 请求新的位置
      */
+    private fun Location.toLocationInfo(): LocationInfo {
+        return LocationInfo(
+            latitude = latitude,
+            longitude = longitude,
+            accuracy = accuracy,
+            altitude = if (hasAltitude()) altitude else null,
+            timestamp = time
+        )
+    }
+    /**
+     * 尝试从系统LocationManager获取最近的位置
+     */
+    private fun getLastKnownLocationFromManager(): LocationInfo? {
+        if (!hasLocationPermission()) return null
+        val providers = locationManager.allProviders
+        var bestLocation: Location? = null
+        for (provider in providers) {
+            val l = runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull() ?: continue
+            if (bestLocation == null || l.accuracy < bestLocation.accuracy) {
+                bestLocation = l
+            }
+        }
+        return bestLocation?.toLocationInfo()
+    }
+
     private fun requestNewLocation(callback: (Result<LocationInfo>) -> Unit) {
         if (!hasLocationPermission()) {
             callback(Result.failure(SecurityException("缺少位置权限")))
@@ -129,12 +168,17 @@ class LocationService(private val context: Context) {
         
         val locationRequest = LocationRequest.Builder(
             Priority.PRIORITY_HIGH_ACCURACY,
-            1000
+            1000L
         ).setMaxUpdates(1).build()
+        
+        // 10秒超时处理，避免长时间等待
+        val timeoutHandler = android.os.Handler(Looper.getMainLooper())
+        var timeoutRunnable: Runnable = Runnable {}
         
         val locationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 val location = result.locations.firstOrNull()
+                timeoutHandler.removeCallbacks(timeoutRunnable)
                 if (location != null) {
                     val locationInfo = LocationInfo(
                         latitude = location.latitude,
@@ -151,6 +195,13 @@ class LocationService(private val context: Context) {
             }
         }
         
+        // 设置超时回调
+        timeoutRunnable = Runnable {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+            callback(Result.failure(Exception("获取位置超时")))
+        }
+        timeoutHandler.postDelayed(timeoutRunnable, 10_000)
+        
         try {
             fusedLocationClient.requestLocationUpdates(
                 locationRequest,
@@ -158,7 +209,9 @@ class LocationService(private val context: Context) {
                 Looper.getMainLooper()
             )
         } catch (e: SecurityException) {
+            timeoutHandler.removeCallbacks(timeoutRunnable)
             callback(Result.failure(e))
         }
+        
     }
 }

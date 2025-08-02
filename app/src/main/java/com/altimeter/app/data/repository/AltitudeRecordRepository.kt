@@ -53,6 +53,13 @@ class AltitudeRecordRepository(context: Context) {
     }
     
     /**
+     * 刷新数据（公开方法，用于外部触发数据重新加载）
+     */
+    fun refreshData() {
+        loadPersistedData()
+    }
+    
+    /**
      * 添加海拔记录
      */
     suspend fun addRecord(altitudeData: AltitudeData, sessionType: SessionType = SessionType.SINGLE_MEASUREMENT): AltitudeRecord {

@@ -35,6 +35,8 @@ app/src/main/java/com/altimeter/app/
 │           ├── CompositeAltitudeServiceImpl.kt # 复合服务
 │           ├── ElevationApiService.kt         # API服务
 │           └── GnssAltitudeService.kt         # GNSS服务
+├── services/                              # 服务层
+│   └── AltitudeMonitoringService.kt      # 前台服务（后台监测）
 ├── ui/                                    # UI层
 │   ├── components/                        # UI组件
 │   │   └── AltitudeChart.kt              # 海拔图表组件
@@ -50,7 +52,9 @@ app/src/main/java/com/altimeter/app/
 │   └── viewmodels/                       # ViewModel层
 │       └── AltimeterViewModel.kt         # 主ViewModel
 └── utils/                                # 工具类
-    └── GnssSystemInfo.kt                 # GNSS系统信息
+    ├── GnssSystemInfo.kt                 # GNSS系统信息
+    ├── ShareHelper.kt                    # 数据分享工具
+    └── PermissionHelper.kt               # 权限检查工具
 ```
 
 ## 核心功能模块
@@ -128,7 +132,41 @@ interface AltitudeService {
 - 智能评分算法：可靠度70% + 精度30%
 - 返回最佳海拔数据
 
-### 3. 数据仓库 (data/repository/)
+### 3. 前台服务 (services/)
+
+#### AltitudeMonitoringService.kt
+后台海拔监测前台服务，解决应用切换到后台后无法继续监测的问题：
+
+**核心功能:**
+```kotlin
+// 启动/停止监测
+fun startMonitoring(intervalMs: Long = 5000L)
+fun stopMonitoring()
+
+// 设置配置
+fun setUpdateInterval(intervalMs: Long)
+fun setAutoRecordEnabled(enabled: Boolean)
+
+// 状态订阅
+val isMonitoring: StateFlow<Boolean>
+val currentLocation: StateFlow<LocationInfo?>
+val latestAltitudeData: StateFlow<List<AltitudeData>>
+val measurementStatus: StateFlow<MeasurementStatus>
+```
+
+**技术特性:**
+- **前台服务**: 使用`START_STICKY`策略确保服务稳定性
+- **通知管理**: 实时在通知栏显示当前海拔信息
+- **电量优化**: 合理管理后台资源，避免过度耗电
+- **服务绑定**: 支持ViewModel通过ServiceConnection双向通信
+- **生命周期**: 正确处理服务启动、绑定、解绑和销毁
+
+**权限要求:**
+- `FOREGROUND_SERVICE` - 前台服务权限
+- `FOREGROUND_SERVICE_LOCATION` - 位置相关前台服务权限
+- `ACCESS_BACKGROUND_LOCATION` - 后台位置访问权限
+
+### 4. 数据仓库 (data/repository/)
 
 #### AltitudeRecordRepository.kt
 海拔记录管理仓库，功能包括：
@@ -452,7 +490,63 @@ implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 - Material Design 3界面
 - 图表可视化
 
-### v1.1.0 (最新更新)
+### v1.3.0 (最新更新)
+**重要修复和优化:**
+- 🔔 **通知显示修复**：修复前台服务通知不显示的关键问题，确保后台服务稳定运行
+- 🔄 **数据同步修复**：修复海拔记录不自动刷新的问题，实现前台服务与UI的实时数据同步
+- 📱 **通知权限管理**：添加Android 13+通知权限支持，确保通知正常显示
+- 🚀 **服务稳定性增强**：提高前台服务重要性级别，防止被系统误杀
+- 🛠️ **调试日志优化**：添加详细的服务状态日志，便于问题诊断
+
+**通知系统改进:**
+- ✅ 修复通知渠道重要性级别（IMPORTANCE_LOW → IMPORTANCE_DEFAULT）
+- ✅ 添加通知权限检查和错误处理
+- ✅ 优化通知图标和显示样式
+- ✅ 增强通知栏操作体验
+
+**数据同步机制:**
+- 🔗 **服务间通信**：前台服务通过StateFlow通知ViewModel有新数据
+- 📊 **自动刷新**：ViewModel监听数据更新信号，自动刷新repository
+- 🎯 **实时同步**：确保UI界面实时显示最新的海拔记录
+
+**权限管理优化:**
+- 🔐 新增`PermissionHelper`工具类统一管理权限检查
+- 📋 支持通知权限、位置权限、后台位置权限的完整检查
+- ⚠️ 自动识别Android版本差异，提供兼容的权限处理
+
+**解决的关键问题:**
+- ✅ 修复通知栏无法显示海拔信息的问题
+- ✅ 修复应用切换到后台后服务被系统杀死的问题
+- ✅ 修复海拔记录需要重新进入应用才能看到更新的问题
+- ✅ 修复前台服务权限配置不完整的问题
+
+### v1.2.0
+**重大功能更新:**
+- 🚀 **后台实时监测服务**：创建前台服务支持应用切换到后台后继续实时监测海拔变化
+- 📱 **持久化通知**：在通知栏显示当前海拔信息，支持一键停止监测
+- 🔋 **电量优化**：使用START_STICKY策略确保服务稳定性，合理管理后台资源
+- 🎯 **服务集成**：ViewModel与前台服务无缝集成，状态同步
+
+**技术架构改进:**
+- 🏗️ **前台服务架构**：新增`AltitudeMonitoringService`前台服务类
+- 🔗 **服务绑定机制**：使用ServiceConnection实现ViewModel与服务的双向通信
+- 📊 **状态管理优化**：服务状态通过StateFlow实时同步到UI层
+- ⚠️ **权限管理增强**：添加前台服务权限和后台位置权限
+- 🛠️ **生命周期管理**：正确处理服务启动、绑定、解绑和销毁
+
+**用户体验提升:**
+- 📲 **无缝切换**：应用后台运行时继续接收海拔数据更新
+- 🔔 **状态通知**：通知栏实时显示当前海拔高度和数据源
+- ⏹️ **便捷控制**：通知栏提供停止按钮，无需重新打开应用
+- 🎛️ **设置同步**：自动记录设置在前台服务中同步生效
+
+**解决的问题:**
+- ✅ 修复应用切换到后台后实时监测停止的问题
+- ✅ 修复长时间后台运行时的内存泄漏问题
+- ✅ 修复ViewModel重复的onCleared()方法冲突
+- ✅ 优化服务启动和停止的稳定性
+
+### v1.1.0
 **修复的问题:**
 - ✅ 修复海拔图表Y轴标签显示异常问题
 - ✅ 修复时间轴横坐标消失问题
