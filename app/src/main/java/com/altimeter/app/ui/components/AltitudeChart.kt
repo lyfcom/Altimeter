@@ -144,17 +144,15 @@ fun AltitudeChart(
                     // 轻点检测
                     .pointerInput(sortedPoints, scaleX, translateX) {
                         detectTapGestures { offset ->
-                            val paddingPx = 20.dp.toPx()
-                            val transformedOffset = Offset(
-                                x = (offset.x - translateX - paddingPx) / scaleX + paddingPx,
-                                y = offset.y
-                            )
                             val clicked = findClickedDataPoint(
-                                offset = transformedOffset,
+                                offset = offset,
+
                                 dataPoints = sortedPoints,
                                 adjustedMin = adjustedMin,
                                 adjustedRange = adjustedRange,
-                                canvasSize = Size(size.width.toFloat(), size.height.toFloat())
+                                canvasSize = Size(size.width.toFloat(), size.height.toFloat()),
+                                scaleX = scaleX,
+                                translateX = translateX
                             )
                             if (clicked != null) {
                                 selectedPoint = clicked
@@ -396,7 +394,9 @@ private fun findClickedDataPoint(
     dataPoints: List<ChartDataPoint>,
     adjustedMin: Double,
     adjustedRange: Double,
-    canvasSize: Size
+    canvasSize: Size,
+    scaleX: Float,
+    translateX: Float
 ): ChartDataPoint? {
     if (dataPoints.isEmpty() || adjustedRange <= 0) return null
     
@@ -408,7 +408,7 @@ private fun findClickedDataPoint(
     
     dataPoints.forEachIndexed { index, point ->
         val baseX = (index.toFloat() / (dataPoints.size - 1).coerceAtLeast(1)) * (width - padding * 2)
-        val x = padding + baseX
+        val x = padding + baseX * scaleX + translateX
         val normalizedAltitude = ((point.altitude - adjustedMin) / adjustedRange).toFloat()
         val y = padding + (height - padding * 2) - (normalizedAltitude * (height - padding * 2))
         
