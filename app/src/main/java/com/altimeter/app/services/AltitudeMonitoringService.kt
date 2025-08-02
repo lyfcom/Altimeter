@@ -151,6 +151,9 @@ class AltitudeMonitoringService : Service() {
                             _currentLocation.value = location
                             processLocationUpdate(location)
                         }
+                } catch (ce: CancellationException) {
+                    // 协程被正常取消（如用户停止监测），视为正常流程，不更新错误状态
+                    Log.i(TAG, "Monitoring coroutine cancelled")
                 } catch (e: Exception) {
                     Log.e(TAG, "Monitoring failed", e)
                     _measurementStatus.value = MeasurementStatus.ERROR

@@ -29,7 +29,7 @@ class GnssAltitudeService : AltitudeService {
                     timestamp = LocalDateTime.now(),
                     latitude = location.latitude,
                     longitude = location.longitude,
-                    description = "GNSS卫星定位获取的海拔高度（支持GPS/北斗/GLONASS/Galileo）"
+                    description = "GNSS卫星定位获取的海拔高度"
                 )
                 
                 Result.success(altitudeData)
