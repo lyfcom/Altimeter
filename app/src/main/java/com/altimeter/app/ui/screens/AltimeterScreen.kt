@@ -21,6 +21,8 @@ import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import java.time.format.DateTimeFormatter
 
+private val ALTITUDE_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
+
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun AltimeterScreen(
@@ -86,7 +88,7 @@ fun AltimeterScreen(
             if (measurementState.data.isNotEmpty()) {
                 AltitudeDataList(
                     altitudeData = measurementState.data,
-                    bestAltitude = viewModel.getBestAltitude()
+                    bestAltitude = measurementState.bestAltitude
                 )
             }
         }
@@ -347,7 +349,10 @@ fun AltitudeDataList(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.heightIn(max = 300.dp)
             ) {
-                items(altitudeData) { data ->
+                items(
+                    items = altitudeData,
+                    key = { "${it.source.name}-${it.timestamp}" }
+                ) { data ->
                     AltitudeDataItem(
                         data = data,
                         isBest = data == bestAltitude
@@ -429,7 +434,7 @@ fun AltitudeDataItem(
             }
             
             Text(
-                text = "更新时间: ${data.timestamp.format(DateTimeFormatter.ofPattern("HH:mm:ss"))}",
+                text = "更新时间: ${data.timestamp.format(ALTITUDE_TIME_FORMATTER)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -437,8 +442,7 @@ fun AltitudeDataItem(
     }
 }
 
-@Composable
-fun getReliabilityColor(reliability: Double): Color {
+private fun getReliabilityColor(reliability: Double): Color {
     return when {
         reliability >= 80 -> Color(0xFF4CAF50) // 绿色 - 高可靠度
         reliability >= 60 -> Color(0xFFFF9800) // 橙色 - 中等可靠度

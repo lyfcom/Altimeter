@@ -71,7 +71,10 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
             
             viewModelScope.launch {
                 monitoringService?.latestAltitudeData?.collect { data ->
-                    _measurementState.value = _measurementState.value.copy(data = data)
+                    _measurementState.value = _measurementState.value.copy(
+                        data = data,
+                        bestAltitude = data.maxByOrNull { it.reliability }
+                    )
                 }
             }
             
@@ -97,7 +100,8 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
         AltitudeMeasurement(
             status = MeasurementStatus.IDLE,
             data = emptyList(),
-            isRealTimeEnabled = null // null表示未知状态，等待服务绑定后同步
+            isRealTimeEnabled = null, // null表示未知状态，等待服务绑定后同步
+            bestAltitude = null
         )
     )
     val measurementState: StateFlow<AltitudeMeasurement> = _measurementState.asStateFlow()
@@ -220,14 +224,17 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
                         val altitudeData = compositeAltitudeService.getAllAltitudeData(location)
                         
                         if (altitudeData.isNotEmpty()) {
+                            val sortedData = altitudeData.sortedByDescending { it.reliability }
+                            val bestData = sortedData.firstOrNull()
+                            
                             _measurementState.value = _measurementState.value.copy(
                                 status = MeasurementStatus.SUCCESS,
-                                data = altitudeData.sortedByDescending { it.reliability }
+                                data = sortedData,
+                                bestAltitude = bestData
                             )
                             
                             // 自动记录最佳海拔数据
                             if (_isAutoRecordEnabled.value) {
-                                val bestData = altitudeData.maxByOrNull { it.reliability }
                                 bestData?.let { data ->
                                     viewModelScope.launch {
                                         recordRepository.addRecord(data, SessionType.SINGLE_MEASUREMENT)
@@ -349,7 +356,8 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
         _measurementState.value = AltitudeMeasurement(
             status = MeasurementStatus.IDLE,
             data = emptyList(),
-            isRealTimeEnabled = false
+            isRealTimeEnabled = false,
+            bestAltitude = null
         )
         _currentLocation.value = null
     }
@@ -358,7 +366,7 @@ class AltimeterViewModel(application: Application) : AndroidViewModel(applicatio
      * 获取最佳海拔数据
      */
     fun getBestAltitude(): AltitudeData? {
-        return _measurementState.value.data.maxByOrNull { it.reliability }
+        return _measurementState.value.bestAltitude
     }
     
     /**
