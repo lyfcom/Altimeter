@@ -200,13 +200,14 @@ class AltitudeMonitoringService : Service() {
             _measurementStatus.value = MeasurementStatus.MEASURING
             
             val altitudeData = compositeAltitudeService.getAllAltitudeData(location)
-            _latestAltitudeData.value = altitudeData.sortedByDescending { it.reliability }
+            val sortedAltitudeData = altitudeData.sortedByDescending { it.reliability }
+            _latestAltitudeData.value = sortedAltitudeData
             
-            if (altitudeData.isNotEmpty()) {
+            if (sortedAltitudeData.isNotEmpty()) {
                 _measurementStatus.value = MeasurementStatus.SUCCESS
                 
                 // 更新通知显示最佳海拔
-                val bestAltitude = altitudeData.maxByOrNull { it.reliability }
+                val bestAltitude = sortedAltitudeData.firstOrNull()
                 bestAltitude?.let { best ->
                     updateNotification("海拔: ${String.format("%.1f", best.altitude)}m (${best.source.displayName})")
                     
