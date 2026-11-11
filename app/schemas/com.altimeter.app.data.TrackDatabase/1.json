@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "b8ab4d79bce9cc8be86ac06188173fa0",
+    "identityHash": "fe897a80c85e89a14e4723525a8ddb41",
     "entities": [
       {
         "tableName": "trips",
@@ -172,14 +172,14 @@
         },
         "indices": [
           {
-            "name": "index_samples_tripId_timeMillis",
+            "name": "index_samples_tripId_id",
             "unique": false,
             "columnNames": [
               "tripId",
-              "timeMillis"
+              "id"
             ],
             "orders": [],
-            "createSql": "CREATE INDEX IF NOT EXISTS `index_samples_tripId_timeMillis` ON `${TABLE_NAME}` (`tripId`, `timeMillis`)"
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_samples_tripId_id` ON `${TABLE_NAME}` (`tripId`, `id`)"
           }
         ],
         "foreignKeys": [
@@ -199,7 +199,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b8ab4d79bce9cc8be86ac06188173fa0')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'fe897a80c85e89a14e4723525a8ddb41')"
     ]
   }
 }

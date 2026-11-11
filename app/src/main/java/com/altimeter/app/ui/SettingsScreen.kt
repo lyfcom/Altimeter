@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
@@ -159,7 +160,7 @@ fun CalibrationDialog(
     onDismiss: () -> Unit,
     onConfirm: (Double) -> Unit,
 ) {
-    var input by remember { mutableStateOf("") }
+    var input by rememberSaveable { mutableStateOf("") }
     val parsed = input.trim().replace(',', '.').toDoubleOrNull()?.let(unit::toMetres)
     val valid = parsed != null && parsed.isFinite() && parsed in -1000.0..10000.0
     AlertDialog(

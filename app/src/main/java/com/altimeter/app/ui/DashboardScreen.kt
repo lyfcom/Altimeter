@@ -80,11 +80,18 @@ fun DashboardScreen(
             }
         }
         if (!state.frame.locationPermission)
-            item { Notice("允许精确定位后可测量卫星高度、保存路线。气压相对测高可以先用。", "启用精确定位", onPermission) }
+            item {
+                Notice(
+                    if (state.frame.hasBarometer) "允许精确定位后可测量卫星高度、保存路线。气压相对测高可以先用。"
+                    else "此设备没有可用气压计。启用精确定位后可测量卫星高度、保存路线。",
+                    "启用精确定位",
+                    onPermission,
+                )
+            }
         else if (!state.frame.gpsEnabled)
             item { Notice("设备定位已关闭。开启后可获取卫星高度与行程位置。", "打开定位设置", onLocationSettings) }
         else if (state.satellite == null) item { Notice("等待有效卫星高度。请到天空开阔处，首次定位可能需要一段时间。") }
-        if (state.calibrationExpired) item { Notice("气压校准已超过 12 小时，已停止将它作为海拔显示。可重新校准，或使用相对高度。") }
+        if (state.calibrationExpired) item { Notice("气压校准已失效，已停止将它作为海拔显示。可重新校准，或使用相对高度。") }
         if (state.frame.fix?.mock == true) item { Notice("当前定位由模拟位置提供，记录与导出会保留此标记。") }
         state.frame.issue?.let { issue -> item { Notice(issue) } }
         item {
@@ -105,7 +112,8 @@ fun DashboardScreen(
                         suffix = "hPa",
                     )
                     Text(
-                        if (state.frame.hasBarometer) "平滑实时读数" else "设备无气压计",
+                        if (!state.frame.hasBarometer) "设备无气压计"
+                        else if (state.barometer == null) "等待读数" else "平滑实时读数",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -270,7 +278,7 @@ private fun AltitudeHero(state: MeasurementState, unit: DistanceUnit) {
                 Text(
                     when {
                         reading == null -> "开启定位，或等待设备气压读数"
-                        reading.reference == HeightReference.RELATIVE -> "以起始气压为零点 · 可随时归零"
+                        reading.reference == HeightReference.RELATIVE -> "以起始气压为零点 · 显示高度变化"
                         reading.reference == HeightReference.ELLIPSOID -> "WGS84 椭球基准 · 不等同于海拔"
                         reading.source == Source.BAROMETER -> "已校准 · 天气变化后请重新校准"
                         else ->

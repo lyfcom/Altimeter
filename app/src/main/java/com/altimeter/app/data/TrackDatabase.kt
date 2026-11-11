@@ -37,7 +37,7 @@ data class TripEntity(
                 onDelete = ForeignKey.CASCADE,
             )
         ],
-    indices = [Index(value = ["tripId", "timeMillis"])],
+    indices = [Index(value = ["tripId", "id"])],
 )
 data class SampleEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,

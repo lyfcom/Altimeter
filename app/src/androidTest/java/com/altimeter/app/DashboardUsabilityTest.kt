@@ -1,6 +1,9 @@
 package com.altimeter.app
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -50,7 +53,7 @@ class DashboardUsabilityTest {
         var selected = MeasureMode.AUTO
         var started = false
         compose.setContent {
-            AltimeterTheme(ThemeMode.LIGHT) {
+            FixtureTheme(ThemeMode.LIGHT) {
                 Column {
                     Box(Modifier.weight(1f)) {
                         DashboardScreen(
@@ -80,6 +83,7 @@ class DashboardUsabilityTest {
         capture("dashboard-light")
         compose.onNodeWithText("开始记录").assertIsDisplayed().performClick()
         org.junit.Assert.assertTrue(started)
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("记录一段起伏"))
         capture("dashboard-controls")
     }
 
@@ -88,7 +92,7 @@ class DashboardUsabilityTest {
         compose.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, 1.6f)) {
-                AltimeterTheme(ThemeMode.DARK) {
+                FixtureTheme(ThemeMode.DARK) {
                     Column {
                         Box(Modifier.weight(1f)) {
                             DashboardScreen(
@@ -112,6 +116,14 @@ class DashboardUsabilityTest {
         compose.onNode(hasScrollAction()).performScrollToNode(hasText("启用精确定位"))
         compose.onNodeWithText("启用精确定位").assertIsDisplayed()
         compose.onNodeWithText("开始记录").assertIsDisplayed().assertIsNotEnabled()
+        capture("dashboard-large-text")
+    }
+
+    @Composable
+    private fun FixtureTheme(mode: ThemeMode, content: @Composable () -> Unit) {
+        AltimeterTheme(mode) {
+            Surface(color = MaterialTheme.colorScheme.background, content = content)
+        }
     }
 
     private fun capture(name: String) {
