@@ -11,8 +11,8 @@ fun height(value: Double?, unit: DistanceUnit, decimals: Int = 1): String =
 
 fun Source.label() =
     when (this) {
-        Source.GNSS -> "卫星定位"
-        Source.BAROMETER -> "气压传感器"
+        Source.GNSS -> "卫星"
+        Source.BAROMETER -> "气压"
     }
 
 fun HeightReference.label() =

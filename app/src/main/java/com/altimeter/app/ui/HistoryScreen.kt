@@ -26,7 +26,7 @@ fun HistoryScreen(trips: List<TripEntity>, unit: DistanceUnit, onSelect: (TripEn
         item {
             Text("行程记录", style = MaterialTheme.typography.headlineLarge)
             Text(
-                "${trips.size} 段行程 · 你的每一段起伏",
+                "${trips.size} 段行程",
                 modifier = Modifier.padding(top = 8.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -42,11 +42,8 @@ fun HistoryScreen(trips: List<TripEntity>, unit: DistanceUnit, onSelect: (TripEn
                         Modifier.size(44.dp),
                         tint = MaterialTheme.colorScheme.primary,
                     )
-                    Text("第一段行程，从这里开始", style = MaterialTheme.typography.titleLarge)
-                    Text(
-                        "在仪表页开始记录。完成后，你的高度曲线、爬升与下降会保存在这里。",
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    Text("暂无行程", style = MaterialTheme.typography.titleLarge)
+                    Text("在仪表页开始记录。", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(16.dp))
                 }
             }
@@ -55,11 +52,6 @@ fun HistoryScreen(trips: List<TripEntity>, unit: DistanceUnit, onSelect: (TripEn
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(trip.title, style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            timestamp(trip.startedAt),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                     Icon(Icons.Outlined.ChevronRight, "查看行程")
                 }
@@ -79,7 +71,7 @@ fun HistoryScreen(trips: List<TripEntity>, unit: DistanceUnit, onSelect: (TripEn
                 }
                 Text(
                     "${trip.sampleCount} 点 · ${trip.endedAt?.let { duration(trip.durationMillis) } ?: "记录中"}" +
-                        if (trip.status == TripStatus.INTERRUPTED) " · 已恢复的中断记录" else "",
+                        if (trip.status == TripStatus.INTERRUPTED) " · 记录中断" else "",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -121,9 +113,7 @@ fun TripDetailSheet(
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             item { Text(trip.title, style = MaterialTheme.typography.headlineMedium) }
-            item {
-                Text(timestamp(trip.startedAt), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+
             error?.let { item { Notice(it) } }
             item {
                 if (points == null && error == null)
@@ -177,7 +167,7 @@ fun TripDetailSheet(
             }
             item {
                 Text(
-                    "CSV 包含全部数据与高度基准。GPX 只导出有位置的采样点；相对高度和椭球高度会放在扩展字段中。",
+                    "CSV 包含全部采样；GPX 仅含定位点，非海平面高度写入扩展字段。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -83,7 +83,7 @@ class DashboardUsabilityTest {
         capture("dashboard-light")
         compose.onNodeWithText("开始记录").assertIsDisplayed().performClick()
         org.junit.Assert.assertTrue(started)
-        compose.onNode(hasScrollAction()).performScrollToNode(hasText("记录一段起伏"))
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("校准高度"))
         capture("dashboard-controls")
     }
 

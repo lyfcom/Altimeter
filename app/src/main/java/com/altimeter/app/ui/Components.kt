@@ -115,7 +115,7 @@ fun AltitudeChart(
     if (points.size < 2) {
         Box(modifier.fillMaxWidth().height(140.dp), contentAlignment = Alignment.Center) {
             Text(
-                "新的高度数据会在这里形成曲线",
+                "等待高度数据",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

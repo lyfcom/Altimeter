@@ -47,10 +47,9 @@ class RecordingController(
                 var trip =
                     TripEntity(
                         UUID.randomUUID().toString(),
-                        "行程 · " +
-                            DateTimeFormatter.ofPattern("MM/dd HH:mm")
-                                .withZone(ZoneId.systemDefault())
-                                .format(Instant.now()),
+                        DateTimeFormatter.ofPattern("yyyy.MM.dd · HH:mm")
+                            .withZone(ZoneId.systemDefault())
+                            .format(Instant.now()),
                         System.currentTimeMillis(),
                         startedElapsed = SystemClock.elapsedRealtime(),
                     )

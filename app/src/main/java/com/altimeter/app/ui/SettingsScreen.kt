@@ -38,7 +38,7 @@ fun SettingsScreen(
                     if (state.barometer?.reference == HeightReference.SEA_LEVEL) "已校准" else "未校准",
                 )
                 Text(
-                    "在海拔已知的地点输入高度，将当地气压作为参考。气象变化会带来漂移，校准在 12 小时后失效。",
+                    "输入已知海拔。校准有效期 12 小时，天气变化后请重新校准。",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -56,9 +56,7 @@ fun SettingsScreen(
                     Text("输入已知海拔")
                 }
                 if (preferences.calibration != null)
-                    TextButton(onClick = onClearCalibration, enabled = !recording) {
-                        Text("清除校准，恢复相对测高")
-                    }
+                    TextButton(onClick = onClearCalibration, enabled = !recording) { Text("清除校准") }
             }
         }
         item {
@@ -120,7 +118,7 @@ fun SettingsScreen(
                     }
                 }
                 Text(
-                    "短间隔保留更多细节，也会增加数据量。记录时保持卫星和气压测量，锁屏后仍会耗电。",
+                    "短间隔保留更多采样点。记录会持续使用定位和传感器。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -129,23 +127,14 @@ fun SettingsScreen(
         item {
             Panel {
                 SectionLabel("读数说明")
-                Text(
-                    "海拔高度\n相对于平均海平面。Android 14 及以上优先使用系统离线模型修正卫星高度；不可用时明确显示椭球高度。",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    "相对高度\n基于气压变化，适合观察楼层、电梯和短时间的高度变化。天气也会影响读数，不把它伪装成绝对海拔。",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    "累计爬升\n使用阈值过滤小幅噪声，数据中断不会连算。数值是估计，缓慢的小幅变化可能被忽略。",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                Text("卫星高度：未完成海平面修正时显示椭球高度，不能作为海拔。", style = MaterialTheme.typography.bodyMedium)
+                Text("相对高度：用于观察短时高度变化，会受天气影响。", style = MaterialTheme.typography.bodyMedium)
+                Text("累计爬升：已过滤小幅噪声，仅作估计。", style = MaterialTheme.typography.bodyMedium)
             }
         }
         item {
             Text(
-                "ALTIMETER  2.0\n离线运行 · 无广告 · 无账号 · 本地存储 · 系统备份遵循设备设置\nCSV 保留所有测量；GPX 只包含有坐标的点。",
+                "Altimeter 2.0 · 离线运行\n本地存储，系统备份遵循设备设置。",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -168,7 +157,7 @@ fun CalibrationDialog(
         title = { Text("校准气压高度") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Text("输入当前位置的已知海拔。优先使用可靠标高；卫星高度也有误差。")
+                Text("输入当前位置的已知海拔，优先使用可靠标高。")
                 OutlinedTextField(
                     value = input,
                     onValueChange = { input = it },
@@ -187,7 +176,7 @@ fun CalibrationDialog(
                         (satellite.accuracyMetres ?: Double.MAX_VALUE) <= 20
                 ) {
                     TextButton(onClick = { input = height(satellite.metres, unit) }) {
-                        Text("填入当前卫星海拔 ${height(satellite.metres, unit)} ${unit.symbol}")
+                        Text("使用卫星海拔 ${height(satellite.metres, unit)} ${unit.symbol}")
                     }
                 }
             }

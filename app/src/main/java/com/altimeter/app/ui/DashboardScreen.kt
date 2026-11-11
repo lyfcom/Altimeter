@@ -45,12 +45,6 @@ fun DashboardScreen(
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("海拔计", style = MaterialTheme.typography.headlineLarge)
-                    Text(
-                        "ALTIMETER  /  FIELD NOTES",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 6.dp),
-                    )
                 }
                 Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                     Icon(
@@ -82,21 +76,19 @@ fun DashboardScreen(
         if (!state.frame.locationPermission)
             item {
                 Notice(
-                    if (state.frame.hasBarometer) "允许精确定位后可测量卫星高度、保存路线。气压相对测高可以先用。"
-                    else "此设备没有可用气压计。启用精确定位后可测量卫星高度、保存路线。",
+                    if (state.frame.hasBarometer) "启用精确定位以测量卫星高度。当前可使用气压测高。" else "无可用气压计，请启用精确定位。",
                     "启用精确定位",
                     onPermission,
                 )
             }
-        else if (!state.frame.gpsEnabled)
-            item { Notice("设备定位已关闭。开启后可获取卫星高度与行程位置。", "打开定位设置", onLocationSettings) }
-        else if (state.satellite == null) item { Notice("等待有效卫星高度。请到天空开阔处，首次定位可能需要一段时间。") }
-        if (state.calibrationExpired) item { Notice("气压校准已失效，已停止将它作为海拔显示。可重新校准，或使用相对高度。") }
-        if (state.frame.fix?.mock == true) item { Notice("当前定位由模拟位置提供，记录与导出会保留此标记。") }
+        else if (!state.frame.gpsEnabled) item { Notice("定位已关闭。", "开启定位", onLocationSettings) }
+        else if (state.satellite == null) item { Notice("等待卫星信号，请移至开阔处。") }
+        if (state.calibrationExpired) item { Notice("气压校准已失效，请重新校准。") }
+        if (state.frame.fix?.mock == true) item { Notice("当前为模拟位置。") }
         state.frame.issue?.let { issue -> item { Notice(issue) } }
         item {
             Panel {
-                SectionLabel("高度变化", "最近 ${trace.size} 个采样")
+                SectionLabel("高度曲线")
                 AltitudeChart(trace, unit)
             }
         }
@@ -112,8 +104,8 @@ fun DashboardScreen(
                         suffix = "hPa",
                     )
                     Text(
-                        if (!state.frame.hasBarometer) "设备无气压计"
-                        else if (state.barometer == null) "等待读数" else "平滑实时读数",
+                        if (!state.frame.hasBarometer) "无气压计"
+                        else if (state.barometer == null) "等待读数" else "实时",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -161,57 +153,30 @@ fun DashboardScreen(
                 }
             }
         }
-        item {
-            Panel {
-                val trip = recording.trip
-                SectionLabel(
-                    if (trip == null) "记录一段起伏" else "行程正在记录",
-                    if (trip == null) "本地保存" else duration(now - trip.startedElapsed),
-                )
-                if (trip != null) {
+        recording.trip?.let { trip ->
+            item {
+                Panel {
+                    SectionLabel("记录中", duration(now - trip.startedElapsed))
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
+                        Metric("爬升", height(trip.ascent, unit, 0), Modifier.weight(1f), unit.symbol)
                         Metric(
-                            "累计爬升",
-                            height(trip.ascent, unit, 0),
-                            modifier = Modifier.weight(1f),
-                            suffix = unit.symbol,
-                        )
-                        Metric(
-                            "累计下降",
+                            "下降",
                             height(trip.descent, unit, 0),
-                            modifier = Modifier.weight(1f),
-                            suffix = unit.symbol,
+                            Modifier.weight(1f),
+                            unit.symbol,
                         )
                     }
                     Text(
-                        if (recording.waitingForSource) "等待原数据源恢复 · 已保存 ${trip.sampleCount} 点"
-                        else "锁屏后继续记录 · ${trip.sampleCount} 个采样点",
+                        if (recording.waitingForSource) "等待信号 · 已保存 ${trip.sampleCount} 点"
+                        else "已保存 ${trip.sampleCount} 点",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                } else
-                    Text(
-                        "记录高度曲线、爬升与下降，结束后导出 CSV 或 GPX。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                if (recording.active)
-                    Text(
-                        "为保持曲线可比，记录期间固定数据源与高度基准。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                }
             }
-        }
-        item {
-            Text(
-                "卫星、气压各有误差。气压受天气影响，爬升值为滤噪后的估计。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -244,12 +209,6 @@ private fun AltitudeHero(state: MeasurementState, unit: DistanceUnit) {
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(reading?.reference?.label() ?: "等待测量", fontSize = 14.sp, color = Signal)
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        if (reading != null) "LIVE" else "READY",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MutedGreen,
-                    )
                 }
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val value =
@@ -266,9 +225,7 @@ private fun AltitudeHero(state: MeasurementState, unit: DistanceUnit) {
                             fontFamily = FontFamily.Monospace,
                         )
                         Text(
-                            unit.symbol.uppercase() +
-                                "  /  " +
-                                (reading?.source?.label() ?: "卫星 · 气压"),
+                            unit.symbol + "  /  " + (reading?.source?.label() ?: "卫星 · 气压"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MutedGreen,
                         )
@@ -277,10 +234,10 @@ private fun AltitudeHero(state: MeasurementState, unit: DistanceUnit) {
                 HorizontalDivider(color = MutedGreen.copy(alpha = .2f))
                 Text(
                     when {
-                        reading == null -> "开启定位，或等待设备气压读数"
-                        reading.reference == HeightReference.RELATIVE -> "以起始气压为零点 · 显示高度变化"
-                        reading.reference == HeightReference.ELLIPSOID -> "WGS84 椭球基准 · 不等同于海拔"
-                        reading.source == Source.BAROMETER -> "已校准 · 天气变化后请重新校准"
+                        reading == null -> "等待定位或气压数据"
+                        reading.reference == HeightReference.RELATIVE -> "以归零点为基准"
+                        reading.reference == HeightReference.ELLIPSOID -> "WGS84 椭球高度，非海拔"
+                        reading.source == Source.BAROMETER -> "已校准"
                         else ->
                             reading.accuracyMetres?.let {
                                 "垂直精度 ±${height(it, unit, 0)} ${unit.symbol}"
